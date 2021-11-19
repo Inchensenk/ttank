@@ -6,7 +6,7 @@
 using namespace std;
 //размер консольного поля в символах
 #define width 120
-#define height 25
+#define height 24
 //символы для каждого обЪекта на карте
 #define field VK_SPACE//символ заполнения поля
 #define fbrick 177//символ разрушаемого припятсвия
@@ -77,30 +77,32 @@ public:
     Tdir dir;//dir куда смотрит танк
     Ttank(int startX, int startY)//начальное положенире танка который по умолчанию смотрит вверх
     {
-        dir = Rup; 
-        sX = startX; 
-        sY = startY; 
+        dir = Rup;
+        sX = startX;
+        sY = startY;
         SetToStart();
     }
 
     void Show(mapHW& map);//отображение танка
     void Move(char w, char s, char a, char d, char fire);//движение танка
+    void MoveBot();//движение танка-бота
     void SetToStart() { x = sX; y = sY; }//возвращение танка в исходное положение
     bool IsHoriz() { return (dir == Rright || dir == Rleft); }// функция IsHoriz() проверяет что танк смотрит горизонтально
     RECT GetRect() { RECT r = { x - 1, y - 1, x + 1, y + 1 }; return r; }// функция GetRect() возвращает область занимаемую танком, для проверки столкновений
 };
 
 //Tmatter это тип препятствия, ttStone-камень, ttBrick-кирпич, ttbase1 - база игрока 1, ttbase2 - база игрока 2
-enum Tmatter { ttStone, ttBrick, ttbase1, ttbase2};
+enum Tmatter { ttStone, ttBrick, ttbase1, ttbase2 };
 
 class Tbrick {
     RECT rct;//rct область которую занимает препятсвие
 public:
+    int x, y;
     bool use;//массив препятсвий статический, поэтому используем use чтобы включать только нужные объекты
     Tmatter tp;//tp тип препятсвия
-    Tbrick() { use = 0; tp = ttBrick; }//в конструкторе указываем что по умолчанию препятсвия выключены(use = 0) тип препятсвия по умолчанию кирпич
+    Tbrick() { use = 0; tp = ttBrick; x = 0; y = 0; }//в конструкторе указываем что по умолчанию препятсвия выключены(use = 0) тип препятсвия по умолчанию кирпич
     void Show(mapHW& map);
-    void SetPos(int px, int py) { RECT r = { px - 1, py-1, px+1, py+1 }; rct = r; use = 1; }//помещение препятсвия в нужную точку
+    void SetPos(int px, int py) { RECT r = { px - 1, py - 1, px + 1, py + 1 }; rct = r; use = 1; }//помещение препятсвия в нужную точку
     RECT GetRect() { return rct; }
 };
 
@@ -110,11 +112,11 @@ class Tpula {
     Tdir dir;
 public:
     bool use;
-    Tpula() { use = 0; speed = 3; }//по умолчанию все пули выключены, скорость пули равна 5 клеткам за такт
+    Tpula() { use = 0; speed = 5; }//по умолчанию все пули выключены, скорость пули равна 5 клеткам за такт
     void SetPula(int px, int py, Tdir pdir)//метод SetPula() создает пулю в указаной точке, то есть делает ее активной и задает ей направление движения
     {
-        x = px; y = py; 
-        dir = pdir; 
+        x = px; y = py;
+        dir = pdir;
         use = 1;
     }
     void Move();//перемещение пули
@@ -190,6 +192,115 @@ void Ttank::Move(char w, char s, char a, char d, char fire)
     if (GetKeyState(fire) < 0)//при нажатии на кнопку огня
         GetFreePula().SetPula(x + pt.x * 2, y + pt.y * 2, dir);//получаем свободныю пулю в массиве(GetFreePula()) и задаем ей координаты и направления а так же активируем(SetPula(x + pt.x * 2, y + pt.y * 2, dir))
 }
+
+int FindBrick(int x, int y)
+{
+    for (int i = 0; i < brickCnt; i++)
+    {
+        if (brick[i].x == x && brick[i].y == y)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int status = 0;
+int route = 0;
+int notstop = 0;
+//реализация движения танка-бота
+void Ttank::MoveBot()
+{
+    if (this->sX == this->x && this->sY == this->y)
+        status = 0;
+    bool fire = false;
+
+    //Выравниваем танк по оси y по отношению к базам
+    if (status == 0)
+    {
+        if (this->y > base1Y)
+        {
+            route = 0;
+        }
+        else if (this->y < base1Y)
+        {
+            route = 1;
+        }
+        else if (this->y == base1Y)
+        {
+            route = 2;
+            status = 1;
+        }
+    }
+    int index = -1;
+    //Ведем танк по заданному направлению, попутно уничтожая ttBrick
+    if (status == 1)
+    {
+
+        if (route == 0)
+            index = FindBrick(this->x, this->y + 3);
+        if (route == 1)
+            index = FindBrick(this->x, this->y - 3);
+        if (route == 2)
+            index = FindBrick(this->x - 3, this->y);
+        if (route == 3)
+            index = FindBrick(this->x + 3, this->y);
+
+        if ((brick[index].tp == ttBrick && brick[index].use == 1)
+            || index == nbase1)
+        {
+            fire = true;
+        }
+        if ((brick[index].tp == ttStone && brick[index].use == 1)
+            || brick[index].tp == ttbase2)
+        {
+            status = 2; // обход
+        }
+
+
+    }
+    //объезд не разрушаемых препятсвий
+    if (status == 2)
+    {
+        int sroute = route;
+        do
+        {
+            route = rand() % 4;
+        } while (route == sroute);
+        status = 1;
+    }
+
+    // 0-вверх, 1-вниз, 2-влево, 3-вправо
+    dir = (Tdir)route;
+    POINT pt = dirInc[dir];
+    Ttank old = *this;
+    x += pt.x;
+    y += pt.y;
+    if (!IsCross(area, GetRect()) ||//если при движении мы вышли за пределы экрана
+        (CheckCrossAnyTank(GetRect(), this) != 0) ||//или столкнулись с другим танком
+        (CheckCrossAnyBrick(GetRect()) != 0))//или столкнулись с препятсвием
+    {
+
+        *this = old;//то мы не перемещаемся
+        if (
+            !((brick[index].tp == ttStone && brick[index].use == 1) &&
+                (brick[index].tp == ttStone && brick[index].use == 0) &&
+                (brick[index].tp == ttBrick && brick[index].use == 0))
+            && index != nbase2)
+            fire = true;
+        notstop++;
+        if (notstop == 5)
+        {
+            status = 2;
+            notstop = 0;
+        }
+    }
+
+
+    //реализация стрельбы
+    if (fire)//при нажатии на кнопку огня
+        GetFreePula().SetPula(x + pt.x * 2, y + pt.y * 2, dir);//получаем свободныю пулю в массиве(GetFreePula()) и задаем ей координаты и направления а так же активируем(SetPula(x + pt.x * 2, y + pt.y * 2, dir))
+}
 void Tbrick::Show(mapHW& map)
 {
     if (!use) return;//если препятсвие не используется, то мы его не показываем. ниже рисуем препятсвие и базы
@@ -197,9 +308,9 @@ void Tbrick::Show(mapHW& map)
         for (int j = rct.top; j <= rct.bottom; j++)
             if (tp == ttBrick)
                 map[j][i] = fbrick;
-            else if (tp==ttStone)
+            else if (tp == ttStone)
                 map[j][i] = fstone;
-            else if (tp==ttbase1)
+            else if (tp == ttbase1)
                 map[j][i] = base1;
             else if (tp == ttbase2)
                 map[j][i] = base2;
@@ -232,9 +343,11 @@ void CreateBattleField()
 {
     int pos = 0;//счетчик элементов массива препятсвий
     for (int i = 5; i < width - 5; i += 3)
-        for (int j = 1; j < height-1; j += 3)//проходим по всей карте с отступом 5 клеток от краев, слева и справа, шаг делаем 3 клетки так как размер препятсвия 3*3
+        for (int j = 1; j < height - 1; j += 3)//проходим по всей карте с отступом 5 клеток от краев, слева и справа, шаг делаем 3 клетки так как размер препятсвия 3*3
         {
             brick[pos].SetPos(i, j);//в этом месте ставим блок
+            brick[pos].x = i;
+            brick[pos].y = j;
             //когда генератор препятсвий дойдет до координаты соответсвующейб координате вешины базы, переменной nbase1 присвоится значение индекса обекта базы в массиве препятсвий;
             if (i == base1X && j == base2Y)
             {
@@ -261,11 +374,11 @@ void CreateBattleField()
 
 int main()
 {
-    
+
     int wins1 = 0;//счетчик попед игрока 1
     int wins2 = 0;//счетчик побед игрока 2
 
-    while(true)
+    while (true)
     {
         srand(time(NULL));//инициализация рандома
         for (int i = 0; i < brickCnt; i++)//создает массив из разрушаемых препятсвий для того чтобы при повторной генерации карты не увеличивалось процентное соотношение неразрушаемых препятсвий
@@ -278,7 +391,9 @@ int main()
         do
         {
             tank[0].Move('W', 'S', 'A', 'D', VK_SPACE);//первый танк управляется кнопками wsad стреляет клавишей пробел
-            tank[1].Move(VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_RETURN);//второй танк управляется стрелками и стреляет клавишей Enter, в параметрах указаны коды виртуальных клавиш
+            //tank[1].Move(VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_RETURN);//второй танк управляется стрелками и стреляет клавишей Enter, в параметрах указаны коды виртуальных клавиш. 
+            tank[1].MoveBot();//Второй танк-бот
+
             for (int i = 0; i < pulaCnt; pula[i++].Move());//движение пуль делаем после движения танков, так как танк может создать пулю вне экрана, что приведет к ошибке при рисовании пули
 
             scr.Clear();
@@ -308,7 +423,10 @@ int main()
         cout << "\t\t\t\t\t\t    Player2 score: " << wins2 << endl << endl;
         cout << endl;
     }
-    
+
 
     return 0;
 }
+
+
+
