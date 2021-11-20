@@ -4,6 +4,27 @@
 #include <ctime>
 
 using namespace std;
+
+#define RESET   "\033[0m"
+
+#define BLACK   "\033[30m"     
+#define RED     "\033[31m"     
+#define GREEN   "\033[32m"      
+#define YELLOW  "\033[33m"      
+#define BLUE    "\033[34m"      
+#define MAGENTA "\033[35m"      
+#define CYAN    "\033[36m"      
+#define WHITE   "\033[37m"    
+
+#define BOLDBLACK   "\033[1m\033[30m"      
+#define BOLDRED     "\033[1m\033[31m"     
+#define BOLDGREEN   "\033[1m\033[32m"      
+#define BOLDYELLOW  "\033[1m\033[33m"      
+#define BOLDBLUE    "\033[1m\033[34m"      
+#define BOLDMAGENTA "\033[1m\033[35m"      
+#define BOLDCYAN    "\033[1m\033[36m"      
+#define BOLDWHITE   "\033[1m\033[37m"      
+
 //размер консольного поля в символах
 #define width 120
 #define height 25
@@ -26,6 +47,8 @@ using namespace std;
 #define duloH 205//дуло для прорисовки по горизонтали
 #define tankC 219//корпус танка
 #define catter 64//гусеница танка
+
+
 
 //переменные для выявления индекса обьекта в массиве препятсвий
 int nbase1 = -1; //Если значение nbase, не присвоится в цикле с pos, то из - за (- 1) выдаст ошибку, так как индексы массива начинаются с 0
@@ -270,7 +293,7 @@ int main()
         srand(time(NULL));//инициализация рандома
         for (int i = 0; i < brickCnt; i++)//создает массив из разрушаемых препятсвий для того чтобы при повторной генерации карты не увеличивалось процентное соотношение неразрушаемых препятсвий
         {
-            brick[i].tp = ttBrick;
+            brick[i].tp = BLUE + ttBrick;
         }
         CreateBattleField();//массив из разрушаемых препятсвий заменяется на новый сгенерированный массив из разрушаемых, неразрушаемых препятсвий и баз игроков
         tank[0].SetToStart();//исходное положение танка 1
@@ -303,9 +326,9 @@ int main()
         } while (GetKeyState(VK_ESCAPE) >= 0);//Функция GetKeyState извлекает данные о состоянии заданной виртуальной клавиши, в даном случае при нажатии на Esc игра перезапускается.
 
         cout << endl;
-        cout << "\t\t\t\t\t\t\tResults" << endl;
-        cout << "\t\t\t\t\t\t    Player1 score: " << wins1 << endl;
-        cout << "\t\t\t\t\t\t    Player2 score: " << wins2 << endl << endl;
+        cout << BOLDRED<< "\t\t\t\t\t\t\tResults" << RESET << endl;
+        cout << BLUE << "\t\t\t\t\t\t    Player score: " << RESET << wins1 << endl;
+        cout << GREEN <<"\t\t\t\t\t\t    Player2 score: " << RESET << wins2 << endl << endl;
         cout << endl;
     }
     
